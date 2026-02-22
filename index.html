@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SimpleTodo — agent.md demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      color: #1a1a1a;
+      min-height: 100vh;
+      padding: 48px 16px;
+    }
+
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 32px;
+    }
+
+    .subtitle a {
+      color: #4f6ef7;
+      text-decoration: none;
+    }
+
+    .subtitle a:hover { text-decoration: underline; }
+
+    .add-form {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .add-form input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1.5px solid #ddd;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      background: white;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .add-form input:focus { border-color: #4f6ef7; }
+
+    .add-form button {
+      padding: 12px 20px;
+      background: #4f6ef7;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .add-form button:hover { background: #3a57d4; }
+
+    .filters {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .filter-btn {
+      padding: 5px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 20px;
+      background: white;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: #555;
+    }
+
+    .filter-btn.active {
+      background: #1a1a1a;
+      border-color: #1a1a1a;
+      color: white;
+    }
+
+    .todo-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .todo-item {
+      background: white;
+      border: 1.5px solid #e8e8e8;
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: opacity 0.2s;
+      animation: slideIn 0.15s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .todo-item.completed { opacity: 0.5; }
+
+    .todo-check {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #ccc;
+      border-radius: 50%;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .todo-item.completed .todo-check {
+      background: #22c55e;
+      border-color: #22c55e;
+    }
+
+    .todo-check::after {
+      content: '';
+      width: 6px;
+      height: 10px;
+      border: 2px solid white;
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg) translateY(-1px);
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+
+    .todo-item.completed .todo-check::after { opacity: 1; }
+
+    .todo-title {
+      flex: 1;
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+
+    .todo-item.completed .todo-title {
+      text-decoration: line-through;
+      color: #888;
+    }
+
+    .todo-delete {
+      background: none;
+      border: none;
+      color: #ccc;
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 0 4px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .todo-delete:hover { color: #ef4444; }
+
+    .footer {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: #888;
+      padding: 0 4px;
+    }
+
+    .clear-btn {
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0;
+      transition: color 0.15s;
+    }
+
+    .clear-btn:hover { color: #ef4444; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 0;
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+
+    /* Agent interface badge */
+    .agent-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f0f4ff;
+      border: 1px solid #c7d4fd;
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      color: #4f6ef7;
+      margin-bottom: 24px;
+      text-decoration: none;
+    }
+
+    .agent-badge::before {
+      content: '⚡';
+    }
+
+    .agent-log {
+      margin-top: 32px;
+      background: #0f1117;
+      border-radius: 12px;
+      padding: 16px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      color: #7dd3fc;
+      min-height: 60px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+
+    .agent-log .log-label {
+      color: #64748b;
+      margin-bottom: 8px;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .log-entry { margin-bottom: 4px; line-height: 1.5; }
+    .log-entry.call { color: #a5b4fc; }
+    .log-entry.result { color: #6ee7b7; }
+    .log-entry.error { color: #fca5a5; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>SimpleTodo</h1>
+  <p class="subtitle">A demo app for the <a href="/agent.md">agent.md</a> standard</p>
+
+  <a class="agent-badge" href="/agent.md">agent.md interface available</a>
+
+  <div class="add-form">
+    <input type="text" id="newTodo" placeholder="Add a new todo…" autocomplete="off">
+    <button onclick="uiAddTodo()">Add</button>
+  </div>
+
+  <div class="filters">
+    <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+    <button class="filter-btn" onclick="setFilter('active', this)">Active</button>
+    <button class="filter-btn" onclick="setFilter('completed', this)">Completed</button>
+  </div>
+
+  <div class="todo-list" id="todoList"></div>
+
+  <div class="footer">
+    <span id="itemCount"></span>
+    <button class="clear-btn" onclick="uiClearCompleted()">Clear completed</button>
+  </div>
+
+  <div class="agent-log" id="agentLog">
+    <div class="log-label">Agent activity log</div>
+    <div class="log-entry" style="color:#475569">Waiting for agent calls via window.__agent…</div>
+  </div>
+</div>
+
+<script>
+// ─── Data layer ──────────────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'agentmd_todos';
+
+function loadTodos() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function saveTodos(todos) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+}
+
+function genId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+// ─── Core actions (pure logic, no UI side effects) ───────────────────────────
+
+function action_list_todos() {
+  return loadTodos();
+}
+
+function action_add_todo(title) {
+  if (!title || !title.trim()) throw new Error('title is required and must be non-empty');
+  const todos = loadTodos();
+  const todo = { id: genId(), title: title.trim(), completed: false, createdAt: new Date().toISOString() };
+  todos.push(todo);
+  saveTodos(todos);
+  return todo;
+}
+
+function action_complete_todo(id) {
+  if (!id) throw new Error('id is required');
+  const todos = loadTodos();
+  const todo = todos.find(t => t.id === id);
+  if (!todo) throw new Error(`Todo with id "${id}" not found`);
+  todo.completed = true;
+  saveTodos(todos);
+  return todo;
+}
+
+function action_uncomplete_todo(id) {
+  if (!id) throw new Error('id is required');
+  const todos = loadTodos();
+  const todo = todos.find(t => t.id === id);
+  if (!todo) throw new Error(`Todo with id "${id}" not found`);
+  todo.completed = false;
+  saveTodos(todos);
+  return todo;
+}
+
+function action_delete_todo(id) {
+  if (!id) throw new Error('id is required');
+  const todos = loadTodos();
+  const idx = todos.findIndex(t => t.id === id);
+  if (idx === -1) throw new Error(`Todo with id "${id}" not found`);
+  todos.splice(idx, 1);
+  saveTodos(todos);
+  return { id };
+}
+
+function action_clear_completed() {
+  const todos = loadTodos();
+  const before = todos.length;
+  const remaining = todos.filter(t => !t.completed);
+  saveTodos(remaining);
+  return { count: before - remaining.length };
+}
+
+// ─── window.__agent interface ─────────────────────────────────────────────────
+// This is the agent-callable surface. Each method:
+//   - accepts a params object (matching the agent.md contract)
+//   - returns a Promise<{ ok: boolean, ...result } | { ok: false, error: string }>
+//   - logs calls and results to the on-screen agent log
+//   - triggers a UI refresh after state changes
+
+function wrapAction(name, fn, mutates = false) {
+  return async function(params = {}) {
+    logCall(name, params);
+    try {
+      const result = await fn(params);
+      const response = { ok: true, ...( Array.isArray(result) ? { todos: result } : result ) };
+      logResult(name, response);
+      if (mutates) renderTodos();
+      return response;
+    } catch (err) {
+      const response = { ok: false, error: err.message };
+      logError(name, response);
+      return response;
+    }
+  };
+}
+
+window.__agent = {
+  __version: '0.1.0',
+  __appName: 'SimpleTodo',
+  __origin: window.location.origin,
+
+  list_todos:       wrapAction('list_todos',       (p) => action_list_todos(),          false),
+  add_todo:         wrapAction('add_todo',         (p) => action_add_todo(p.title),     true),
+  complete_todo:    wrapAction('complete_todo',    (p) => action_complete_todo(p.id),   true),
+  uncomplete_todo:  wrapAction('uncomplete_todo',  (p) => action_uncomplete_todo(p.id), true),
+  delete_todo:      wrapAction('delete_todo',      (p) => action_delete_todo(p.id),     true),
+  clear_completed:  wrapAction('clear_completed',  (p) => action_clear_completed(),     true),
+};
+
+// ─── Agent activity log ───────────────────────────────────────────────────────
+
+function logCall(name, params) {
+  appendLog('call', `→ __agent.${name}(${JSON.stringify(params)})`);
+}
+
+function logResult(name, result) {
+  appendLog('result', `← ${JSON.stringify(result)}`);
+}
+
+function logError(name, result) {
+  appendLog('error', `✗ ${JSON.stringify(result)}`);
+}
+
+function appendLog(type, text) {
+  const log = document.getElementById('agentLog');
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  entry.textContent = text;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ─── UI layer ─────────────────────────────────────────────────────────────────
+
+let currentFilter = 'all';
+
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTodos();
+}
+
+function renderTodos() {
+  const todos = loadTodos();
+  const filtered = todos.filter(t => {
+    if (currentFilter === 'active') return !t.completed;
+    if (currentFilter === 'completed') return t.completed;
+    return true;
+  });
+
+  const list = document.getElementById('todoList');
+  list.innerHTML = '';
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state">${
+      currentFilter === 'completed' ? 'No completed todos yet.' :
+      currentFilter === 'active' ? 'All done! Nothing left to do.' :
+      'No todos yet. Add one above!'
+    }</div>`;
+  } else {
+    filtered.forEach(todo => {
+      const item = document.createElement('div');
+      item.className = `todo-item${todo.completed ? ' completed' : ''}`;
+      item.innerHTML = `
+        <div class="todo-check" onclick="uiToggle('${todo.id}', ${todo.completed})"></div>
+        <span class="todo-title">${escHtml(todo.title)}</span>
+        <button class="todo-delete" onclick="uiDelete('${todo.id}')" title="Delete">×</button>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  const active = todos.filter(t => !t.completed).length;
+  document.getElementById('itemCount').textContent =
+    `${active} item${active !== 1 ? 's' : ''} left`;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// UI-triggered wrappers (call the same core actions)
+function uiAddTodo() {
+  const input = document.getElementById('newTodo');
+  const title = input.value.trim();
+  if (!title) return;
+  action_add_todo(title);
+  input.value = '';
+  renderTodos();
+}
+
+function uiToggle(id, completed) {
+  completed ? action_uncomplete_todo(id) : action_complete_todo(id);
+  renderTodos();
+}
+
+function uiDelete(id) {
+  action_delete_todo(id);
+  renderTodos();
+}
+
+function uiClearCompleted() {
+  action_clear_completed();
+  renderTodos();
+}
+
+// Enter key support
+document.getElementById('newTodo').addEventListener('keydown', e => {
+  if (e.key === 'Enter') uiAddTodo();
+});
+
+// Initial render
+renderTodos();
+</script>
+</body>
+</html>

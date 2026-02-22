@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      padding: 16px;
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 14px;
+      font-weight: 700;
+      margin: 0 0 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ccc;
+      flex-shrink: 0;
+    }
+    .dot.active { background: #22c55e; }
+    .dot.inactive { background: #ef4444; }
+
+    .origin { font-size: 11px; color: #888; margin-bottom: 16px; }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    .app-desc {
+      font-size: 12px;
+      color: #444;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+
+    .tool-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .tool-item {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .tool-name {
+      font-family: 'SF Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: #4f6ef7;
+      margin-bottom: 2px;
+    }
+
+    .tool-desc {
+      font-size: 11px;
+      color: #555;
+      line-height: 1.4;
+    }
+
+    .no-contract {
+      text-align: center;
+      color: #888;
+      padding: 20px 0;
+      line-height: 1.6;
+    }
+
+    .no-contract a {
+      color: #4f6ef7;
+      text-decoration: none;
+    }
+
+    .actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    button {
+      flex: 1;
+      padding: 7px 10px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      background: white;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: #333;
+    }
+
+    button:hover { background: #f5f5f5; }
+
+    button.primary {
+      background: #4f6ef7;
+      border-color: #4f6ef7;
+      color: white;
+    }
+    button.primary:hover { background: #3a57d4; }
+  </style>
+</head>
+<body>
+
+<h2>
+  <span class="dot" id="statusDot"></span>
+  agent.md Bridge
+</h2>
+<div class="origin" id="originLabel">Checking…</div>
+
+<div id="content">
+  <div class="no-contract">Loading…</div>
+</div>
+
+<div class="actions" style="margin-top: 12px">
+  <button onclick="refresh()">↻ Refresh</button>
+  <button class="primary" onclick="openAgentMd()">View agent.md</button>
+</div>
+
+<script>
+let currentOrigin = '';
+
+async function load() {
+  const response = await chrome.runtime.sendMessage({ type: 'GET_CONTRACT' });
+  const { contract, origin } = response || {};
+  currentOrigin = origin || '';
+
+  document.getElementById('originLabel').textContent = origin || 'Unknown origin';
+
+  const dot = document.getElementById('statusDot');
+  const content = document.getElementById('content');
+
+  if (!contract) {
+    dot.className = 'dot inactive';
+    content.innerHTML = `
+      <div class="no-contract">
+        This site does not serve an <code>/agent.md</code> file.<br><br>
+        <a href="https://github.com/agentmd/spec" target="_blank">Learn how to add one →</a>
+      </div>`;
+    return;
+  }
+
+  dot.className = 'dot active';
+
+  const toolsHtml = contract.actions.map(a => `
+    <div class="tool-item">
+      <div class="tool-name">agentmd_${a.name}</div>
+      <div class="tool-desc">${a.description}</div>
+    </div>
+  `).join('');
+
+  content.innerHTML = `
+    <div class="section-label">${contract.appName}</div>
+    <div class="app-desc">${contract.description}</div>
+    <div class="section-label">${contract.actions.length} MCP Tool${contract.actions.length !== 1 ? 's' : ''} available</div>
+    <div class="tool-list">${toolsHtml}</div>
+  `;
+}
+
+function refresh() {
+  chrome.runtime.sendMessage({ type: 'INVALIDATE_CACHE' });
+  document.getElementById('content').innerHTML = '<div class="no-contract">Refreshing…</div>';
+  setTimeout(load, 300);
+}
+
+function openAgentMd() {
+  if (currentOrigin) {
+    chrome.tabs.create({ url: `${currentOrigin}/agent.md` });
+  }
+}
+
+load();
+</script>
+</body>
+</html>

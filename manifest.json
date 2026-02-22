@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "agent.md Bridge",
+  "version": "0.1.0",
+  "description": "Exposes web app agent.md interfaces as MCP tools to local agents",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "agent.md Bridge"
+  },
+  "native_messaging_hosts": {
+    "com.agentmd.bridge": "native-host/com.agentmd.bridge.json"
+  }
+}
