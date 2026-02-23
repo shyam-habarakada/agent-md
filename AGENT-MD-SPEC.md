@@ -1,55 +1,129 @@
+Network Working Group                                     Open Proposal
+Request for Comments: draft-agent-md-00                  February 2026
+Category: Standards Track
+
 # agent.md Specification
 
-**Version:** 0.1.0  
-**Status:** Draft Proposal  
+**Version:** 0.1.0
+**Status:** Draft Proposal
 **Authors:** Open proposal — contributions welcome
 
----
+## Abstract
 
-## Overview
+This document defines `agent.md`, a convention for web applications to
+expose a structured, human- and machine-readable action contract at a
+well-known URL (`/agent.md`). The contract describes what actions an
+authorized agent may invoke on the application — without scraping HTML,
+simulating clicks, or reverse-engineering the UI. It also defines the
+`window.__agent` JavaScript interface that applications register to make
+those actions callable, and describes a browser extension bridge that
+surfaces declared actions as Model Context Protocol (MCP) tools.
 
-`agent.md` is a convention for web applications to expose a structured, human+machine-readable contract at a well-known URL (`/agent.md`). It describes what the app does and declares a set of JavaScript functions that any authorized agent can discover and invoke — without scraping HTML, simulating clicks, or reverse-engineering the UI.
+## Status of This Memo
 
-Think of it as:
-- `robots.txt` → what crawlers *can't* do
-- `sitemap.xml` → where pages *are*
-- `agent.md` → what agents *can do*, and *how*
+This document is a draft proposal open for community discussion and
+contribution. It does not represent a finalized standard. Distribution
+of this memo is unlimited.
 
----
+## Table of Contents
 
-## Motivation
+    1.  Introduction
+    2.  Conventions and Definitions
+    3.  Motivation
+    4.  The Contract File: /agent.md
+        4.1.  Format
+        4.2.  Requirements
+    5.  The Window Interface: window.__agent
+        5.1.  Reserved Properties
+        5.2.  Action Signature
+    6.  The Browser Extension Bridge
+        6.1.  Architecture
+        6.2.  Extension Behavior
+    7.  Security Considerations
+    8.  Adoption Path
+    9.  Relationship to Existing Standards
+    10. Open Questions
+    11. Contributing
 
-Today's AI agents interacting with web apps must:
-- Take screenshots and parse visual layout
-- Simulate mouse clicks and keyboard input
-- Wait for DOM mutations and guess at state
-- Reverse-engineer UI flows with no guaranteed stability
+## 1. Introduction
 
-This is expensive, fragile, and wasteful. A web app that explicitly exposes agent-callable actions can be driven with near-zero overhead, full reliability, and explicit authorization.
+`agent.md` is a convention for web applications to expose a structured,
+human- and machine-readable contract at a well-known URL (`/agent.md`).
+It describes what the app does and declares a set of JavaScript
+functions that any authorized agent can discover and invoke.
 
-`agent.md` fills the gap between:
-- **MCP** (Model Context Protocol) — great for agent↔tool communication, but requires server-side infrastructure
-- **llms.txt** — great for content/documentation discovery, but read-only
-- **Raw browser automation** — works anywhere, but blind and brittle
+The role of `agent.md` can be understood by analogy to existing
+well-known files:
 
-`agent.md` + a browser extension MCP bridge gives agents a direct, low-cost interface to *any* web app that opts in — with no backend changes required beyond serving a single file and registering window functions.
+- `robots.txt` declares what crawlers MUST NOT do.
+- `sitemap.xml` declares where pages are.
+- `agent.md` declares what agents MAY do, and how.
 
----
+## 2. Conventions and Definitions
 
-## The Contract File: `/agent.md`
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+"SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+"OPTIONAL" in this document are to be interpreted as described in
+BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+capitals, as shown here.
 
-Every participating web app serves a Markdown file at `https://<domain>/agent.md`.
+**action**: A named JavaScript function declared in `/agent.md` and
+registered on `window.__agent` that an agent may invoke.
 
-### Format
+**bridge extension**: A user-installed browser extension that reads
+`/agent.md`, parses declared actions, and exposes them as MCP tools
+over stdio.
+
+**contract file**: The Markdown document served at `/agent.md`.
+
+## 3. Motivation
+
+AI agents interacting with web applications currently must take
+screenshots and parse visual layout, simulate mouse clicks and keyboard
+input, wait for DOM mutations and infer state, and reverse-engineer UI
+flows with no guaranteed stability.
+
+This approach is expensive, fragile, and wasteful. A web application
+that explicitly exposes agent-callable actions can be driven with
+near-zero overhead, full reliability, and explicit authorization.
+
+`agent.md` fills the gap between several existing approaches:
+
+- **MCP** (Model Context Protocol) is well-suited for agent-to-tool
+  communication but requires server-side infrastructure the web
+  application must build and operate.
+- **llms.txt** supports content and documentation discovery but is
+  read-only and does not declare callable actions.
+- **Browser automation** works against any web application but is
+  unaware of application structure and brittle against UI changes.
+
+`agent.md` combined with a browser extension MCP bridge gives agents a
+direct, low-overhead interface to any participating web application,
+with no backend changes required beyond serving a single file and
+registering window functions.
+
+## 4. The Contract File: /agent.md
+
+Every participating web application MUST serve a Markdown file at
+`https://<domain>/agent.md`.
+
+### 4.1. Format
+
+The contract file follows the schema below:
 
 ```markdown
 # <App Name>
 
-> <One-paragraph description of the app's purpose and domain>
+> <Description of the app's purpose and domain>
 
 ## Auth
-- type: <none | session | token>
-- note: <optional human-readable note about authentication requirements>
+
+In this initial version, we assume that the agent is operating on
+behalf of the user in their existing browser session. In this case,
+the agent (e.g. Claude co-work) will effectively "inherit" the user's
+authentication and permissions.
+
+Future versions of the spec may support additional authentication modes.
 
 ## Actions
 
@@ -65,32 +139,36 @@ Every participating web app serves a Markdown file at `https://<domain>/agent.md
 ...
 ```
 
-### Rules
+### 4.2. Requirements
 
-1. The file MUST be served at exactly `/agent.md` from the root of the domain.
-2. The file MUST be valid Markdown and human-readable.
-3. All declared actions MUST be available on `window.__agent` when the page is loaded.
-4. Each action MUST return a Promise resolving to a plain JSON-serializable object.
+1. The file MUST be served at exactly `/agent.md` from the root of the
+   domain.
+2. The file MUST be valid Markdown and human-readable without tooling.
+3. All declared actions MUST be available on `window.__agent` when the
+   page is loaded.
+4. Each action MUST return a Promise resolving to a plain
+   JSON-serializable object.
 5. Each action MUST include an `ok: boolean` field in its return value.
 6. On error, actions MUST return `{ ok: false, error: "<message>" }`.
 7. Actions MUST NOT require the agent to interact with the DOM directly.
-8. The `window.__agent` object MUST include a `__version` string matching the spec version in `agent.md`.
+8. The `window.__agent` object MUST include a `__version` string
+   matching the spec version declared in `agent.md`.
 
----
+## 5. The Window Interface: window.__agent
 
-## The Window Interface: `window.__agent`
+When a page loads, the web application registers its actions on
+`window.__agent`. A browser extension or in-page script may then call
+these functions directly.
 
-When a page loads, the web app registers its actions on `window.__agent`. A browser extension (or in-page script) can then call these functions directly.
+### 5.1. Reserved Properties
 
-### Reserved Properties
+| Property     | Type   | Description                                      |
+|--------------|--------|--------------------------------------------------|
+| `__version`  | string | Spec version, e.g. `"0.1.0"`                    |
+| `__appName`  | string | App name matching the H1 in agent.md             |
+| `__origin`   | string | The origin this agent interface belongs to       |
 
-| Property | Type | Description |
-|---|---|---|
-| `__version` | string | Spec version, e.g. `"0.1.0"` |
-| `__appName` | string | App name matching the H1 in agent.md |
-| `__origin` | string | The origin this agent interface belongs to |
-
-### Action Signature
+### 5.2. Action Signature
 
 ```typescript
 window.__agent.<action_name>(params: object): Promise<AgentResult>
@@ -102,65 +180,94 @@ interface AgentResult {
 }
 ```
 
----
+## 6. The Browser Extension Bridge
 
-## The Browser Extension Bridge
+A browser extension reads `/agent.md` from the active tab's origin and
+exposes the declared actions as MCP tools over stdio. This allows any
+local MCP-capable agent (Claude Code, Cursor, custom scripts) to drive
+web applications through a clean tool interface without DOM interaction.
 
-A browser extension reads `/agent.md` from the active tab's origin, then exposes the declared actions as MCP tools over stdio. This allows any local MCP-capable agent (Claude Code, Cursor, custom scripts) to drive web apps through a clean tool interface — no DOM scraping required.
-
-### Architecture
+### 6.1. Architecture
 
 ```
 Local Agent (MCP Client)
         ↕ stdio / MCP protocol
 Browser Extension (MCP Server + Bridge)
         ↕ chrome.scripting / window.__agent
-Active Browser Tab (Web App)
+Active Browser Tab (Web Application)
         ↕ /agent.md discovery
 agent.md contract
 ```
 
-### Extension Behavior
+### 6.2. Extension Behavior
 
-1. On connection, the extension fetches `/agent.md` from the active tab's origin.
-2. It parses the declared actions from the Markdown.
+1. On connection, the extension fetches `/agent.md` from the active
+   tab's origin.
+2. It parses the declared actions from the Markdown contract.
 3. It registers one MCP tool per declared action.
-4. When a tool is called, it injects a script into the active tab that calls `window.__agent.<action>()`.
+4. When a tool is called, it injects a script into the active tab that
+   invokes `window.__agent.<action>()`.
 5. The result is returned to the MCP client.
 
----
+## 7. Security Considerations
 
-## Security Model
+### 7.1. Scope of This Protocol
 
-### What this is NOT
+This protocol is NOT a mechanism for remote agents to drive browsers
+without user consent. It is NOT an unauthenticated API — the browser
+session's existing authentication applies. It is NOT intended as a
+replacement for backend APIs in server-to-server communication.
 
-- This is NOT a way for remote agents to drive browsers without user consent.
-- This is NOT an unauthenticated API — the browser session's existing auth applies.
-- This is NOT a replacement for backend APIs for server-to-server use.
+### 7.2. Protections
 
-### What protects users
+**Extension mediation.** The browser extension is a user-installed,
+user-controlled bridge. The user decides which agents may connect.
 
-1. **Extension mediation**: The browser extension is a user-installed, user-controlled bridge. The user decides which agents can connect.
-2. **Origin scoping**: `window.__agent` actions only apply to the current page's origin. The extension never calls actions cross-origin.
-3. **Session auth passthrough**: Actions run in the context of the user's existing browser session — no separate credentials are shared with the agent.
-4. **No DOM elevation**: Actions are explicitly declared JS functions, not arbitrary JS execution. Extensions should call only named `window.__agent.*` methods.
-5. **Explicit opt-in**: A web app must deliberately serve `/agent.md` and register `window.__agent`. There is no passive exposure.
+**Origin scoping.** `window.__agent` actions apply only to the current
+page's origin. The extension MUST NOT call actions cross-origin.
 
----
+**Session authentication passthrough.** Actions run in the context of
+the user's existing browser session. No credentials are shared with the
+agent.
 
-## Example: Todo App
+**No DOM elevation.** Actions are explicitly declared JavaScript
+functions, not arbitrary code execution. Extensions SHOULD invoke only
+named `window.__agent.*` methods.
 
-### `/agent.md`
+**Explicit opt-in.** A web application must deliberately serve
+`/agent.md` and register `window.__agent`. There is no passive
+exposure.
+
+## 8. Adoption Path
+
+This specification is intentionally zero-infrastructure. To adopt it, a
+web application requires only:
+
+1. A static `/agent.md` file served from the domain root.
+2. Approximately 30 lines of JavaScript to register `window.__agent`
+   actions on page load.
+
+No new backend routes, no API keys, and no SDK installation are
+required. The browser extension MCP bridge is a user-side component
+that agent developers may build independently; web applications need not
+be aware of its existence.
+
+### Example: Todo Application
+
+The following is a complete example contract file and corresponding
+`window.__agent` registration for a minimal todo application.
+
+**`/agent.md`:**
 
 ```markdown
 # SimpleTodo
 
-> A minimal todo list app. Supports creating, listing, completing, and deleting tasks.
-> All data is stored per-user session.
+> A minimal todo list app. Supports creating, listing, completing, and
+> deleting tasks. All data is stored per-user session.
 
 ## Auth
 - type: session
-- note: User must be logged in. Actions use the active browser session automatically.
+- note: User must be logged in. Actions use the active browser session.
 
 ## Actions
 
@@ -192,42 +299,34 @@ agent.md contract
 - example: `window.__agent.delete_todo({ id: "abc123" })`
 ```
 
----
+## 9. Relationship to Existing Standards
 
-## Adoption Path
+| Standard    | Role                       | Relationship to agent.md                          |
+|-------------|----------------------------|----------------------------------------------------|
+| `robots.txt`| Crawler access control     | Complementary — agent.md is opt-in action exposure |
+| `llms.txt`  | LLM content guidance       | Complementary — llms.txt for content, agent.md for actions |
+| MCP         | Agent-to-tool protocol     | agent.md actions are surfaced as MCP tools by the bridge |
+| OpenAPI     | REST API description       | Analogous in spirit, but client-side and session-scoped |
 
-This spec is intentionally zero-infrastructure. To adopt it, a web app needs only:
+## 10. Open Questions
 
-1. Create and serve a static `/agent.md` file.
-2. Add ~30 lines of JavaScript to register `window.__agent` actions.
+The following questions are open for community discussion:
 
-No new backend routes, no API keys to manage, no SDK to install.
+- Should `/agent.md` support versioning via `?v=` query parameters or
+  ETags?
+- Should there be a standard `__agent.describe()` method that returns
+  the parsed contract as a JSON object?
+- Should the spec define a set of universal actions (e.g. `navigate`,
+  `get_page_context`) that all conforming applications SHOULD implement?
+- Should the bridge extension maintain a local cache or registry of
+  known `agent.md` contracts?
+- How should multi-page applications handle action availability across
+  SPA route changes versus full page loads?
+- How should single-page applications (SPAs) handle dynamic registration
+  of actions as the user navigates within the app?
 
-The browser extension MCP bridge is a separate, user-side component that any agent developer can build — web apps don't need to know it exists.
+## 11. Contributing
 
----
-
-## Relationship to Existing Standards
-
-| Standard | Role | Relationship |
-|---|---|---|
-| `robots.txt` | Crawler access control | Complementary — agent.md is opt-in action exposure |
-| `llms.txt` | LLM content guidance | Complementary — llms.txt for content, agent.md for actions |
-| MCP | Agent↔tool protocol | agent.md actions are surfaced *as* MCP tools by the bridge extension |
-| OpenAPI | REST API description | Analogous in spirit, but client-side and session-scoped |
-
----
-
-## Open Questions
-
-- Should `/agent.md` support versioning with `?v=` params or ETags?
-- Should there be a standard `__agent.describe()` method returning the parsed contract as JSON?
-- Should the spec define a standard set of "universal" actions (e.g. `navigate`, `get_page_context`) all apps should implement?
-- Should the extension maintain a local cache/registry of known agent.md contracts?
-- How should multi-page apps handle action availability (SPA routing vs. page loads)?
-
----
-
-## Contributing
-
-This is an open draft. Discuss, fork, propose changes. The goal is a simple, adoptable standard — not a committee process.
+This is an open draft. Discussion, forks, and proposed changes are
+welcome. The goal is a simple, adoptable standard arrived at through
+rough consensus, not a committee process.
