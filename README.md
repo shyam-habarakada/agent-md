@@ -10,6 +10,8 @@ Request for Comments: draft-agent-md-00                  February 2026
 **Status:** Draft Proposal
 **Authors:** Open proposal — contributions welcome
 
+Join discord server at https://discord.gg/NC3ArNT5Y6
+
 ## Abstract
 
 This document defines `agent.md`, a convention for web applications to
