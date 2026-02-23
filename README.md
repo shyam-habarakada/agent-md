@@ -4,9 +4,7 @@
 > directly invoke web app actions — without scraping HTML, simulating
 > clicks, or reverse-engineering UIs.
 
-Network Working Group                                     Open Proposal
 Request for Comments: draft-agent-md-00                  February 2026
-Category: Standards Track
 
 **Version:** 0.1.0
 **Status:** Draft Proposal
