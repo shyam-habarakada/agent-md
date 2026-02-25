@@ -16,12 +16,15 @@ Join discord server at https://discord.gg/NC3ArNT5Y6
 
 This document defines `agent.md`, a convention for web applications to
 expose a structured, human- and machine-readable action contract at a
-well-known URL (`/agent.md`). The contract describes what actions an
-authorized agent may invoke on the application — without scraping HTML,
-simulating clicks, or reverse-engineering the UI. It also defines the
-`window.__agent` JavaScript interface that applications register to make
-those actions callable, and describes a browser extension bridge that
-surfaces declared actions as Model Context Protocol (MCP) tools.
+well-known URL (`/agent.md`). The protocol is designed for human-in-the-
+loop workflows in which an AI agent assists a user who is actively
+present in a browser session — not for fully autonomous or unattended
+operation. The contract describes what actions an authorized agent may
+invoke on the application — without scraping HTML, simulating clicks, or
+reverse-engineering the UI. It also defines the `window.__agent`
+JavaScript interface that applications register to make those actions
+callable, and describes a browser extension bridge that surfaces declared
+actions as Model Context Protocol (MCP) tools.
 
 ## Status of This Memo
 
@@ -72,7 +75,11 @@ stability guarantees. This is expensive, fragile, and absurd given that
 the app *already knows* what it can do. There is simply no standard way
 for a web app to say "here are my actions, here's how to call them."
 
-`agent.md` fills that gap.
+`agent.md` fills that gap. It is designed specifically for human-in-the-
+loop workflows: an AI agent acting as a capable assistant to a user who
+remains present, in control, and able to intervene. This is not a
+protocol for unattended automation or headless agents operating without
+a user.
 
 ## 2. Conventions and Definitions
 
@@ -90,6 +97,11 @@ registered on `window.__agent` that an agent may invoke.
 over stdio.
 
 **contract file**: The Markdown document served at `/agent.md`.
+
+**human-in-the-loop**: A workflow model in which a human user is
+actively present and able to observe, guide, or interrupt an agent
+operating on their behalf. This protocol assumes human-in-the-loop
+operation throughout.
 
 ## 3. Motivation
 
@@ -228,10 +240,13 @@ agent.md contract
 
 ### 7.1. Scope of This Protocol
 
-This protocol is NOT a mechanism for remote agents to drive browsers
-without user consent. It is NOT an unauthenticated API — the browser
-session's existing authentication applies. It is NOT intended as a
-replacement for backend APIs in server-to-server communication.
+This protocol is designed for human-in-the-loop workflows in which a
+user is actively present in the browser session. It is NOT a mechanism
+for remote agents to drive browsers without user consent. It is NOT an
+unauthenticated API — the browser session's existing authentication
+applies. It is NOT intended for fully autonomous or unattended operation,
+and it is NOT a replacement for backend APIs in server-to-server
+communication.
 
 ### 7.2. Protections
 
@@ -439,20 +454,66 @@ agent-md/
 
 ## 12. Open Questions
 
-The following questions are open for community discussion:
+The following questions are open for community discussion and are listed
+in no particular order.
 
-- Should `/agent.md` support versioning via `?v=` query parameters or
-  ETags?
-- Should there be a standard `__agent.describe()` method that returns
-  the parsed contract as a JSON object?
-- Should the spec define a set of universal actions (e.g. `navigate`,
-  `get_page_context`) that all conforming applications SHOULD implement?
-- Should the bridge extension maintain a local cache or registry of
-  known `agent.md` contracts?
-- How should multi-page applications handle action availability across
-  SPA route changes versus full page loads?
-- How should single-page applications (SPAs) handle dynamic registration
-  of actions as the user navigates within the app?
+- **CAPTCHA and human verification.** How should the protocol handle
+  actions that trigger CAPTCHA challenges or other human verification
+  steps? Should the contract be able to declare that certain actions may
+  require human intervention mid-execution, and if so, what is the
+  signaling mechanism back to the agent?
+
+- **Rate limiting.** An agent can invoke actions far faster than a human
+  user, potentially triggering server-side rate limits or anomaly
+  detection. Should the spec define conventions for apps to declare rate
+  limits in the contract, or for agents to voluntarily throttle?
+
+- **Action confirmation and consent gates.** Should the spec support
+  marking certain actions as requiring explicit user confirmation before
+  the agent may execute them (e.g., "submit payment", "delete account")?
+  How would the bridge surface such a requirement to the agent and the
+  user?
+
+- **Idempotency declarations.** Should actions be able to declare
+  whether they are idempotent? Agents need to know whether it is safe to
+  retry a call that failed without a clear response.
+
+- **Async and long-running actions.** The current spec assumes actions
+  resolve promptly. What is the recommended pattern for operations that
+  take seconds or minutes (e.g., file exports, background jobs)? Should
+  there be a polling or callback convention?
+
+- **Agent attribution and audit trails.** Should the spec define a
+  mechanism for the bridge to identify agent-initiated actions to the
+  web application, so apps can log or audit them separately from human-
+  initiated actions?
+
+- **Conditional action availability.** Some actions may only be valid in
+  certain application states (e.g., only when a record is selected, only
+  for users with a specific role). Should the contract support declaring
+  preconditions, or should apps return a structured error when an action
+  is called out of context?
+
+- **Multi-origin applications.** How should the spec handle applications
+  that span multiple origins (e.g., authentication at `auth.example.com`
+  and the main app at `app.example.com`)? Should cross-origin action
+  delegation be supported, and if so, how?
+
+- **Contract versioning.** Should `/agent.md` support versioning via
+  `?v=` query parameters or ETags so agents can detect when the contract
+  has changed?
+
+- **Machine-readable contract introspection.** Should there be a
+  standard `__agent.describe()` method that returns the parsed contract
+  as a structured JSON object for programmatic consumption?
+
+- **Universal baseline actions.** Should the spec define a set of
+  universal actions (e.g. `navigate`, `get_page_context`) that all
+  conforming applications SHOULD implement?
+
+- **Contract caching.** Should the bridge extension maintain a local
+  cache or registry of known `agent.md` contracts, and if so, what are
+  the invalidation rules?
 
 ## 13. Contributing
 
