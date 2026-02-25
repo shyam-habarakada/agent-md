@@ -10,7 +10,7 @@ Request for Comments: draft-agent-md-00                  February 2026
 **Status:** Draft Proposal
 **Authors:** Open proposal — contributions welcome
 
-Join discord server at https://discord.gg/NC3ArNT5Y6
+[![Discord](https://cdn.discordapp.com/icons/1475613359452721255/2534726e06d5ea29bce3bdd09e89f8d9.png)](https://discord.gg/NC3ArNT5Y6)
 
 ## Abstract
 
